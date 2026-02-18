@@ -89,10 +89,6 @@ python autotypingchat.py
 - requests библиотека
 - Активный VK токен
 
-## 📄 Лицензия
-
-MIT License
-
 ## 👨‍💻 Автор
 
 [Александр](https://vk.com/sorryykatana)
