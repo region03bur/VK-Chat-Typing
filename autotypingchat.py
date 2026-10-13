@@ -22,7 +22,7 @@ running = True  # Флаг для управления потоками
 os.system('cls' if os.name == 'nt' else 'clear')
 
 print("╔" + "═" * 58 + "╗")
-print("║                    🚀 АВТО ТАЙПИНГ ДЛЯ ЧАТА 🚀                  ║")
+print("║          🚀 АВТО ТАЙПИНГ ДЛЯ ЧАТА 🚀          ║")
 print("╠" + "═" * 58 + "╣")
 print(f"║   Чат ID: {CHAT_ID:<47} ║")
 print(f"║   Интервал: {INTERVAL} сек{' ' * 38} ║")
@@ -94,7 +94,7 @@ def print_hourly_stats() -> None:
 
             print()
             print("╔" + "═" * 58 + "╗")
-            print("║                  📊 ЧАСОВАЯ СТАТИСТИКА 📊                  ║")
+            print("║          📊 ЧАСОВАЯ СТАТИСТИКА 📊          ║")
             print("╠" + "═" * 58 + "╣")
             print(f"║  ⏱ Время работы: {uptime.days}д {hours:02d}ч {minutes:02d}м {seconds:02d}с{' ' * 27} ║")
             print(f"║  ✍️ Отправлено статусов: {typing_count:<38} ║")
@@ -120,7 +120,7 @@ def print_final_stats() -> None:
     success_rate = (typing_count / total_ops * 100) if total_ops > 0 else 0
 
     print("\n" + "╔" + "═" * 58 + "╗")
-    print("║                    👋 РАБОТА ЗАВЕРШЕНА 👋                  ║")
+    print("║          👋 РАБОТА ЗАВЕРШЕНА 👋          ║")
     print("╠" + "═" * 58 + "╣")
     print(f"║  ⏱ Всего работал: {uptime.days}д {hours:02d}ч {minutes:02d}м {seconds:02d}с{' ' * 26} ║")
     print(f"║  ✍️ Всего отправлено: {typing_count:<38} ║")
