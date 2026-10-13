@@ -34,7 +34,7 @@ pip install requests
 
 ### Получение VK токена
 1. Перейдите на https://vkhost.github.io/
-2. Выбрать VK Admin, далее скопировать токен от token= до знака &, как на изображении ![вот здесь](https://github.com/region03bur/VK-Chat-Typing/blob/main/token.jpg)
+2. Выбрать VK Conect, далее скопировать токен от token= до знака &, как на изображении ![вот здесь](https://github.com/region03bur/VK-Chat-Typing/blob/main/token.jpg)
 
 
 ### Параметры в коде
