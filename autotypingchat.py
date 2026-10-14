@@ -3,40 +3,77 @@ import time
 import logging
 from datetime import datetime, timedelta
 import os
-import sys
 import threading
-from typing import NoReturn
-# Настройка
+
+# ==================== НАСТРОЙКА ====================
 VK_TOKEN = 'ТОКЕН СЮДА'
-CHAT_ID = 113 # заменить на свой айди чата
+CHAT_ID = 129
 PEER_ID = 2000000000 + CHAT_ID
-INTERVAL = 3  # Интервал отправки статуса (секунд)
+INTERVAL = 3
+# ===================================================
 
 # Статистика
 typing_count = 0
 error_count = 0
 start_time = datetime.now()
-running = True  # Флаг для управления потоками
+running = True
+last_error_msg = "-"
 
-# Очистка консоли и приветствие
+# Цвета (ANSI) — работают в современных терминалах Windows 10+/Linux/macOS
+class C:
+    RESET = '\033[0m'
+    BOLD = '\033[1m'
+    DIM = '\033[2m'
+    RED = '\033[91m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    BLUE = '\033[94m'
+    MAGENTA = '\033[95m'
+    CYAN = '\033[96m'
+    WHITE = '\033[97m'
+    GRAY = '\033[90m'
+
+# Включаем ANSI на Windows
+if os.name == 'nt':
+    os.system('')
+
 os.system('cls' if os.name == 'nt' else 'clear')
 
-print("╔" + "═" * 58 + "╗")
-print("║          🚀 АВТО ТАЙПИНГ ДЛЯ ЧАТА 🚀          ║")
-print("╠" + "═" * 58 + "╣")
-print(f"║   Чат ID: {CHAT_ID:<47} ║")
-print(f"║   Интервал: {INTERVAL} сек{' ' * 38} ║")
-print(f"║   Запуск: {start_time.strftime('%H:%M:%S')}{' ' * 39} ║")
-print(f"║   Статистика: каждый час{' ' * 34} ║")
-print("╚" + "═" * 58 + "╝")
-print()
-
-# Настройка логирования (только для критических ошибок)
 logging.basicConfig(level=logging.ERROR, format='%(asctime)s - %(message)s', datefmt='%H:%M:%S')
+
+W = 62  # ширина рамки
+
+def line(text: str = "", color: str = "") -> None:
+    """Печать строки, обрезанной/дополненной до ширины рамки"""
+    # Учитываем только видимые символы
+    visible = text
+    # Обрезаем если слишком длинно
+    if len(visible) > W - 2:
+        visible = visible[:W - 5] + "..."
+    pad = W - 2 - len(visible)
+    print(f"{C.CYAN}║{C.RESET} {color}{visible}{C.RESET}{' ' * pad}{C.CYAN}║{C.RESET}")
+
+def top() -> None:
+    print(f"{C.CYAN}╔{'═' * (W - 2)}╗{C.RESET}")
+
+def mid() -> None:
+    print(f"{C.CYAN}╠{'═' * (W - 2)}╣{C.RESET}")
+
+def bottom() -> None:
+    print(f"{C.CYAN}╚{'═' * (W - 2)}╝{C.RESET}")
+
+def header(title: str) -> None:
+    top()
+    line(title.center(W - 2), C.BOLD + C.MAGENTA)
+    mid()
+
+def log(msg: str, color: str = "") -> None:
+    ts = datetime.now().strftime('%H:%M:%S')
+    print(f"{C.GRAY}[{ts}]{C.RESET} {color}{msg}{C.RESET}")
 
 def send_typing() -> bool:
     """Отправка статуса 'печатает'"""
-    global typing_count, error_count
+    global typing_count, error_count, last_error_msg
 
     url = 'https://api.vk.com/method/messages.setActivity'
     params = {
@@ -52,30 +89,52 @@ def send_typing() -> bool:
 
         if 'error' in data:
             error_count += 1
+            err = data['error']
+            last_error_msg = f"API {err.get('error_code')}: {err.get('error_msg')}"
+            log(last_error_msg, C.RED)
             return False
 
         typing_count += 1
+        last_error_msg = "-"
         return True
 
-    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+    except requests.exceptions.Timeout:
         error_count += 1
+        last_error_msg = "Таймаут запроса"
+        log(last_error_msg, C.RED)
+        return False
+    except requests.exceptions.ConnectionError:
+        error_count += 1
+        last_error_msg = "Ошибка соединения"
+        log(last_error_msg, C.RED)
         return False
     except Exception as e:
         error_count += 1
+        last_error_msg = f"Исключение: {e}"
+        log(last_error_msg, C.RED)
         return False
 
+def uptime_str() -> str:
+    up = datetime.now() - start_time
+    h = up.seconds // 3600
+    m = (up.seconds % 3600) // 60
+    s = up.seconds % 60
+    return f"{up.days}д {h:02d}ч {m:02d}м {s:02d}с"
+
+def success_rate() -> float:
+    total = typing_count + error_count
+    return (typing_count / total * 100) if total > 0 else 0.0
+
 def print_hourly_stats() -> None:
-    """Вывод полной статистики каждый час"""
+    """Вывод статистики каждый час"""
     global running
 
     while running:
         try:
-            # Ждем до следующего часа
             now = datetime.now()
             next_hour = (now + timedelta(hours=1)).replace(minute=0, second=0, microsecond=0)
             sleep_seconds = (next_hour - now).total_seconds()
 
-            # Проверяем каждую секунду, не пора ли остановиться
             for _ in range(int(sleep_seconds)):
                 if not running:
                     return
@@ -84,65 +143,65 @@ def print_hourly_stats() -> None:
             if not running:
                 return
 
-            uptime = datetime.now() - start_time
-            hours = uptime.seconds // 3600
-            minutes = (uptime.seconds % 3600) // 60
-            seconds = uptime.seconds % 60
-
-            total_ops = typing_count + error_count
-            success_rate = (typing_count / total_ops * 100) if total_ops > 0 else 0
+            total = typing_count + error_count
+            rate = success_rate()
+            rate_color = C.GREEN if rate >= 95 else C.YELLOW if rate >= 80 else C.RED
 
             print()
-            print("╔" + "═" * 58 + "╗")
-            print("║          📊 ЧАСОВАЯ СТАТИСТИКА 📊          ║")
-            print("╠" + "═" * 58 + "╣")
-            print(f"║  ⏱ Время работы: {uptime.days}д {hours:02d}ч {minutes:02d}м {seconds:02d}с{' ' * 27} ║")
-            print(f"║  ✍️ Отправлено статусов: {typing_count:<38} ║")
-            print(f"║  ❌ Ошибок: {error_count:<44} ║")
-            print(f"║  📈 Успешность: {success_rate:.1f}%{' ' * 40} ║")
-            print(f"║  📨 Всего операций: {total_ops:<38} ║")
-            print(f"║  🕒 {datetime.now().strftime('%H:%M:%S')}{' ' * 45} ║")
-            print("╚" + "═" * 58 + "╝")
+            header("📊  ЧАСОВАЯ СТАТИСТИКА  📊")
+            line(f"⏱  Аптайм:        {uptime_str()}", C.WHITE)
+            line(f"✍️  Отправлено:    {typing_count}", C.GREEN)
+            line(f"❌  Ошибок:        {error_count}", C.RED if error_count else C.GRAY)
+            line(f"📨  Всего операций:{total}", C.WHITE)
+            line(f"📈  Успешность:    {rate:.1f}%", rate_color)
+            line(f"🕒  Время:         {datetime.now().strftime('%H:%M:%S')}", C.GRAY)
+            bottom()
             print()
 
         except Exception as e:
-            # Логируем ошибку, но продолжаем работу
             logging.error(f"Ошибка в потоке статистики: {e}")
-            time.sleep(60)  # Пауза перед следующей попыткой
+            time.sleep(60)
 
 def print_final_stats() -> None:
-    """Вывод финальной статистики при завершении"""
-    uptime = datetime.now() - start_time
-    hours = uptime.seconds // 3600
-    minutes = (uptime.seconds % 3600) // 60
-    seconds = uptime.seconds % 60
-    total_ops = typing_count + error_count
-    success_rate = (typing_count / total_ops * 100) if total_ops > 0 else 0
+    """Вывод финальной статистики"""
+    total = typing_count + error_count
+    rate = success_rate()
+    rate_color = C.GREEN if rate >= 95 else C.YELLOW if rate >= 80 else C.RED
 
-    print("\n" + "╔" + "═" * 58 + "╗")
-    print("║          👋 РАБОТА ЗАВЕРШЕНА 👋          ║")
-    print("╠" + "═" * 58 + "╣")
-    print(f"║  ⏱ Всего работал: {uptime.days}д {hours:02d}ч {minutes:02d}м {seconds:02d}с{' ' * 26} ║")
-    print(f"║  ✍️ Всего отправлено: {typing_count:<38} ║")
-    print(f"║  ❌ Всего ошибок: {error_count:<41} ║")
-    print(f"║  📈 Успешность: {success_rate:.1f}%{' ' * 40} ║")
-    print(f"║  📨 Всего операций: {total_ops:<38} ║")
-    print(f"║  📅 Завершен: {datetime.now().strftime('%H:%M:%S')}{' ' * 38} ║")
-    print("╚" + "═" * 58 + "╝")
+    print()
+    header("👋  РАБОТА ЗАВЕРШЕНА  👋")
+    line(f"⏱  Время работы:  {uptime_str()}", C.WHITE)
+    line(f"✍️  Отправлено:    {typing_count}", C.GREEN)
+    line(f"❌  Ошибок:        {error_count}", C.RED if error_count else C.GRAY)
+    line(f"📨  Всего операций:{total}", C.WHITE)
+    line(f"📈  Успешность:    {rate:.1f}%", rate_color)
+    line(f"📅  Завершено:     {datetime.now().strftime('%H:%M:%S')}", C.GRAY)
+    bottom()
 
 def main() -> None:
     """Основная функция"""
     global running
     fail_count = 0
-    max_fails = 5  # Максимальное количество ошибок подряд
-    fail_sleep = 30  # Секунд паузы при ошибках
+    max_fails = 5
+    fail_sleep = 30
 
-    # Запускаем поток для часовой статистики
+    # Стартовая панель
+    print()
+    header("🚀  АВТО ТАЙПИНГ ДЛЯ ЧАТА  🚀")
+    line(f"💬  Чат ID:      {CHAT_ID}", C.CYAN)
+    line(f"🔗  Peer ID:     {PEER_ID}", C.CYAN)
+    line(f"⏱  Интервал:    {INTERVAL} сек", C.CYAN)
+    line(f"🕒  Запуск:      {start_time.strftime('%H:%M:%S')}", C.CYAN)
+    line(f"📊  Статистика:  каждый час", C.CYAN)
+    bottom()
+    print()
+
+    # Поток часовой статистики
     stats_thread = threading.Thread(target=print_hourly_stats, daemon=True)
     stats_thread.start()
 
-    print("🔄 Начинаю отправку статусов...")
-    print("⏹ Для остановки нажмите Ctrl+C")
+    log("Начинаю отправку статусов...", C.GREEN)
+    log("Для остановки нажмите Ctrl+C", C.YELLOW)
     print()
 
     try:
@@ -150,31 +209,28 @@ def main() -> None:
             if not send_typing():
                 fail_count += 1
                 if fail_count >= max_fails:
-                    print(f"⚠️ Слишком много ошибок ({max_fails}), пауза {fail_sleep} сек...")
+                    log(f"Подряд {max_fails} ошибок, пауза {fail_sleep}с...", C.YELLOW)
                     time.sleep(fail_sleep)
                     fail_count = 0
             else:
-                fail_count = 0  # Сбрасываем счетчик при успешной отправке
+                fail_count = 0
 
             time.sleep(INTERVAL)
 
     except KeyboardInterrupt:
-        running = False  # Останавливаем поток статистики
-        print("\n\n⏳ Завершение работы...")
-        time.sleep(1)  # Даем время потоку статистики завершиться
+        running = False
+        log("Завершение работы...", C.YELLOW)
+        time.sleep(1)
         print_final_stats()
-        # Просто выходим, без sys.exit()
         return
     except Exception as e:
         running = False
-        print(f"\n❌ Критическая ошибка: {e}")
+        log(f"Критическая ошибка: {e}", C.RED)
         print_final_stats()
-        # При критической ошибке все равно выходим без sys.exit()
         return
 
 if __name__ == "__main__":
     try:
         main()
     except SystemExit:
-        # Ловим SystemExit на всякий случай
         pass
